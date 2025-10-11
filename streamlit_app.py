@@ -200,10 +200,13 @@ if uploaded_files:
 
     st.subheader("📊 Summary Table")
     st.dataframe(
-        df[["Image", "Downlink (Mbps)", "Uplink (Mbps)", "Ping (ms)",
-            "Downlink MB/s", "Uplink MB/s", "Test Time", "Device / Operator", "Notes"]],
-        width='stretch'
+        df[[
+            "Image", "Downlink (Mbps)", "Uplink (Mbps)", "Ping (ms)",
+            "Downlink MB/s", "Uplink MB/s", "Test Time", "Device / Operator", "Notes"
+        ]],
+        use_container_width=True
     )
+
 
     csv = df.to_csv(index=False).encode("utf-8")
     st.download_button(
