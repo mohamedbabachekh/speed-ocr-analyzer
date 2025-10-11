@@ -21,6 +21,7 @@ st.title("📡 Speed OCR Analyzer (OpenAI Vision)")
 st.caption("Upload one or more Speedtest screenshots. The app extracts Downlink/Uplink Mbps using OpenAI Vision, then computes MB/s and GB/h.")
 
 # ------------- Sidebar Configuration -------------
+# ------------- Sidebar Configuration -------------
 with st.sidebar:
     st.header("⚙️ Settings")
 
@@ -35,23 +36,23 @@ with st.sidebar:
         placeholder="Paste your OpenAI API key here..."
     )
 
-    # Use pasted key if provided, else fallback to environment variable
+    # Determine which key to use
     if api_key_input.strip():
-        os.environ["OPENAI_API_KEY"] = api_key_input.strip()
-        client = OpenAI(api_key=api_key_input.strip())
-        st.success("✅ API key provided via input")
+        api_key = api_key_input.strip()
+        st.success("✅ Using API key from input box")
     elif os.getenv("OPENAI_API_KEY"):
-        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-        st.success("✅ API key found in environment")
+        api_key = os.getenv("OPENAI_API_KEY")
+        st.success("✅ Using API key from environment variable")
     else:
-        client = None
-        st.error("❌ No API key found. Please paste one above.")
+        api_key = None
+        st.error("❌ No API key found. Please paste one above or set it as an environment variable.")
 
     st.divider()
     st.caption("You can obtain an API key from [platform.openai.com](https://platform.openai.com/api-keys).")
 
+# Initialize client once (only if key exists)
+client: Optional[OpenAI] = OpenAI(api_key=api_key) if api_key else None
 
-client = OpenAI(api_key=api_key_input)
 
 # ------------------ HELPERS ------------------
 DECIMAL_MB_PER_GB = 1000.0
