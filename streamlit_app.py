@@ -172,8 +172,8 @@ def ask_openai_for_speeds(img_bytes: bytes, model_name: str) -> Dict:
 
 
 # ------------------ STREAMLIT APP ------------------
-st.title("📡 Speedtest Analyzer (AI Vision)")
-st.caption("Upload Speedtest screenshots — extract Mbps, Ping, Time, and Device/Operator automatically.")
+# st.title("📡 Speedtest Analyzer (AI Vision)")
+# st.caption("Upload Speedtest screenshots — extract Mbps, Ping, Time, and Device/Operator automatically.")
 
 uploaded_files = st.file_uploader(
     "📸 Upload one or more Speedtest screenshots",
