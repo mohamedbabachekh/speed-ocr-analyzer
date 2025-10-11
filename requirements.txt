@@ -2,8 +2,9 @@ altair==5.4.1
 numpy==2.1.1
 openai>=1.51.0
 opencv-python==4.10.0.84
-pandas==2.2.3
-Pillow==10.4.0
 protobuf==5.28.2
 pydeck==0.9.1
-streamlit==1.38.0
+streamlit>=1.40.0
+openai>=1.51.0
+pandas
+pillow
