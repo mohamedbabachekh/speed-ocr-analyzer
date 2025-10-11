@@ -178,7 +178,10 @@ uploaded_files = st.file_uploader(
     accept_multiple_files=True
 )
 
-if uploaded_files:
+# Add a "Run Analysis" button
+run_analysis = st.button("▶️ Run Analysis", type="primary", use_container_width=True)
+
+if uploaded_files and run_analysis:
     rows = []
     st.info(f"Processing {len(uploaded_files)} image(s) using {model}...")
     progress = st.progress(0)
@@ -189,7 +192,6 @@ if uploaded_files:
 
         with st.expander(f"Preview — {name}"):
             st.image(Image.open(io.BytesIO(img_bytes)), caption=name, use_container_width=True)
-
 
         result = ask_openai_for_speeds(img_bytes, model)
         dl, ul, ping = result.get("downlink_mbps"), result.get("uplink_mbps"), result.get("ping_ms")
@@ -224,13 +226,16 @@ if uploaded_files:
         use_container_width=True
     )
 
-
     csv = df.to_csv(index=False).encode("utf-8")
     st.download_button(
         "💾 Download results as CSV",
         data=csv,
         file_name="speedtest_ai_results.csv",
-        mime="text/csv"
+        mime="text/csv",
+        use_container_width=True
     )
+
+elif uploaded_files and not run_analysis:
+    st.warning("⚙️ Click **Run Analysis** to process the uploaded screenshots.")
 else:
     st.info("👆 Upload one or more images to start the analysis.")
