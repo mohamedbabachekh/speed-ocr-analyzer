@@ -8,12 +8,12 @@ from PIL import Image
 from typing import Dict, Optional
 
 # OpenAI SDK (Responses API)
-from dotenv import load_dotenv
+# from dotenv import load_dotenv
 import os
 from openai import OpenAI
 
-load_dotenv()  # Loads .env file
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# load_dotenv()  # Loads .env file
+# client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # ------------- Streamlit UI -------------
 st.set_page_config(page_title="📡 Speed OCR Analyzer (OpenAI)", page_icon="📶", layout="wide")
@@ -50,6 +50,8 @@ with st.sidebar:
     st.divider()
     st.caption("You can obtain an API key from [platform.openai.com](https://platform.openai.com/api-keys).")
 
+
+client = OpenAI(api_key=api_key_input)
 
 # ------------------ HELPERS ------------------
 DECIMAL_MB_PER_GB = 1000.0
