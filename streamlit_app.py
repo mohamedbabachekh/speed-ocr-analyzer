@@ -1,27 +1,29 @@
 import os
 import io
 import re
-import base64,json
+import base64
+import json
 import pandas as pd
 import streamlit as st
 from PIL import Image
 from typing import Dict, Optional
-
-# OpenAI SDK (Responses API)
-# from dotenv import load_dotenv
-import os
 from openai import OpenAI
 
-# load_dotenv()  # Loads .env file
-# client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# ----------------------------------------------------
+# 🧠 STREAMLIT PAGE CONFIG
+# ----------------------------------------------------
+st.set_page_config(page_title="📡 Speed OCR Analyzer (OpenAI Vision)", page_icon="📶", layout="wide")
 
-# ------------- Streamlit UI -------------
-st.set_page_config(page_title="📡 Speed OCR Analyzer (OpenAI)", page_icon="📶", layout="wide")
+# ✅ TITLE & DESCRIPTION
 st.title("📡 Speed OCR Analyzer (OpenAI Vision)")
-st.caption("Upload one or more Speedtest screenshots. The app extracts Downlink/Uplink Mbps using OpenAI Vision, then computes MB/s and GB/h.")
+st.caption(
+    "Upload one or more Speedtest screenshots. The app extracts Downlink/Uplink Mbps using OpenAI Vision, "
+    "then computes MB/s and GB/h."
+)
 
-# ------------- Sidebar Configuration -------------
-# ------------- Sidebar Configuration -------------
+# ----------------------------------------------------
+# ⚙️ SIDEBAR SETTINGS
+# ----------------------------------------------------
 with st.sidebar:
     st.header("⚙️ Settings")
 
@@ -37,24 +39,22 @@ with st.sidebar:
     )
 
     # Determine which key to use
-    if api_key_input.strip():
-        api_key = api_key_input.strip()
-        st.success("✅ Using API key from input box")
-    elif os.getenv("OPENAI_API_KEY"):
-        api_key = os.getenv("OPENAI_API_KEY")
-        st.success("✅ Using API key from environment variable")
+    api_key = api_key_input.strip() or st.secrets.get("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY"))
+
+    if api_key:
+        st.success("✅ Using OpenAI API key")
     else:
-        api_key = None
         st.error("❌ No API key found. Please paste one above or set it as an environment variable.")
 
     st.divider()
     st.caption("You can obtain an API key from [platform.openai.com](https://platform.openai.com/api-keys).")
 
-# Initialize client once (only if key exists)
+# Initialize client once
 client: Optional[OpenAI] = OpenAI(api_key=api_key) if api_key else None
 
-
-# ------------------ HELPERS ------------------
+# ----------------------------------------------------
+# 🧮 HELPERS
+# ----------------------------------------------------
 DECIMAL_MB_PER_GB = 1000.0
 BINARY_MB_PER_GIB = 1024.0
 
@@ -75,35 +75,20 @@ def compute_units(mbps: float) -> Dict[str, float]:
 def to_b64(img_bytes: bytes, mime="image/jpeg") -> str:
     return f"data:{mime};base64," + base64.b64encode(img_bytes).decode("utf-8")
 
-
-# Strict schema for structured output
-SPEEDTEST_SCHEMA = {
-    "name": "speedtest_reading",
-    "schema": {
-        "type": "object",
-        "additionalProperties": False,
-        "properties": {
-            "downlink_mbps": {"type": ["number", "null"], "description": "Download speed in Mbps"},
-            "uplink_mbps": {"type": ["number", "null"], "description": "Upload speed in Mbps"},
-            "ping_ms": {"type": ["number", "null"], "description": "Latency in milliseconds"},
-            "test_time": {"type": ["string", "null"], "description": "Clock time at top of screen, e.g. '20:49'"},
-            "device_info": {"type": ["string", "null"], "description": "Device and operator info, e.g. 'inwi SM-S906E | Orange Casablanca'"},
-            "notes": {"type": "string", "description": "Any detection remarks or confidence comments"}
-        },
-        "required": ["downlink_mbps", "uplink_mbps"]
-    }
-}
-
+# ----------------------------------------------------
+# 📋 OPENAI VISION EXTRACTOR
+# ----------------------------------------------------
 SYSTEM_INSTRUCTIONS = (
     "You are an OCR assistant for Speedtest screenshots. "
     "Extract numeric values for download (descendant/downlink) and upload (ascendant/uplink) speeds in Mbps, "
     "and ping latency (ms) if visible. Also extract the visible clock time and device/operator info. "
-    "Normalize commas to periods (e.g., 66,5 → 66.5). Return only JSON conforming to the schema. "
+    "Normalize commas to periods (e.g., 66,5 → 66.5). Return valid JSON with keys: "
+    "downlink_mbps, uplink_mbps, ping_ms, test_time, device_info, notes. "
     "If a field is not visible, return null."
 )
 
 def ask_openai_for_speeds(img_bytes: bytes, model_name: str) -> Dict:
-    """Send image to OpenAI Vision model; parse numeric values manually if structured output not supported."""
+    """Send image to OpenAI Vision model and parse JSON response."""
     if not client:
         return {"notes": "❌ No OpenAI client initialized"}
 
@@ -127,23 +112,21 @@ def ask_openai_for_speeds(img_bytes: bytes, model_name: str) -> Dict:
             }],
         )
 
+        # Try parsing JSON directly from the model output
         raw = getattr(resp, "output_text", "")
         m = re.search(r"\{.*\}", raw, re.S)
         if m:
             return json.loads(m.group(0))
 
-        # fallback: regex detection
+        # Fallback regex extraction if JSON fails
         text = raw.lower()
-        dl = ul = ping = None
-        time_str = None
-        device_info = None
-
         num = r"(\d+(?:[.,]\d+)?)"
-        dl_m = re.search(r"(descendant|download|downlink|dl)\D{0,10}" + num, text, re.I)
-        ul_m = re.search(r"(ascendant|upload|uplink|ul)\D{0,10}" + num, text, re.I)
-        p_m = re.search(r"(ping)\D{0,6}" + num, text, re.I)
+        dl = ul = ping = time_str = device_info = None
+        dl_m = re.search(r"(descendant|download|downlink|dl)\D{0,10}" + num, text)
+        ul_m = re.search(r"(ascendant|upload|uplink|ul)\D{0,10}" + num, text)
+        p_m = re.search(r"(ping)\D{0,6}" + num, text)
         t_m = re.search(r"\b(\d{1,2}[:hH]\d{2})\b", text)
-        op_m = re.search(r"(inwi|maroc ?telecom|orange).*?(casablanca|rabat|tanger|fes|marrakech)?", text, re.I)
+        op_m = re.search(r"(inwi|maroc ?telecom|orange).*?(casablanca|rabat|tanger|fes|marrakech)?", text)
 
         if dl_m: dl = float(dl_m.group(2).replace(",", "."))
         if ul_m: ul = float(ul_m.group(2).replace(",", "."))
@@ -170,11 +153,9 @@ def ask_openai_for_speeds(img_bytes: bytes, model_name: str) -> Dict:
             "notes": f"API error: {e}"
         }
 
-
-# ------------------ STREAMLIT APP ------------------
-# st.title("📡 Speedtest Analyzer (AI Vision)")
-# st.caption("Upload Speedtest screenshots — extract Mbps, Ping, Time, and Device/Operator automatically.")
-
+# ----------------------------------------------------
+# 📤 MAIN APP
+# ----------------------------------------------------
 uploaded_files = st.file_uploader(
     "📸 Upload one or more Speedtest screenshots",
     type=["jpg", "jpeg", "png"],
