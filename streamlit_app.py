@@ -12,6 +12,22 @@ from openai import OpenAI
 # ----------------------------------------------------
 # 🧠 STREAMLIT PAGE CONFIG
 # ----------------------------------------------------
+
+st.markdown("""
+    <style>
+    /* Make text and buttons bigger on mobile */
+    @media (max-width: 768px) {
+        .stButton button {
+            width: 100%;
+            font-size: 1.1rem;
+        }
+        .stTextInput input, .stFileUploader label {
+            font-size: 1rem !important;
+        }
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 st.set_page_config(page_title="📡 Speed OCR Analyzer (OpenAI Vision)", page_icon="📶", layout="wide")
 
 # ✅ TITLE & DESCRIPTION
@@ -172,7 +188,8 @@ if uploaded_files:
         img_bytes = f.getvalue()
 
         with st.expander(f"Preview — {name}"):
-            st.image(Image.open(io.BytesIO(img_bytes)), caption=name, width=512)
+            st.image(Image.open(io.BytesIO(img_bytes)), caption=name, use_container_width=True)
+
 
         result = ask_openai_for_speeds(img_bytes, model)
         dl, ul, ping = result.get("downlink_mbps"), result.get("uplink_mbps"), result.get("ping_ms")
