@@ -117,27 +117,30 @@ def ask_openai_for_speeds(img_bytes: bytes, model_name: str) -> Dict:
             input=[{
                 "role": "user",
                 "content": [
-                    {"type": "input_text",
-                     "text": (
-                         "Extract Downlink (Mbps), Uplink (Mbps), Ping (ms), visible clock time (e.g. '20:49'), "
-                         "and device/operator info (e.g. 'inwi SM-S906E | Orange Casablanca'). "
-                         "Return valid JSON with keys: downlink_mbps, uplink_mbps, ping_ms, test_time, device_info, notes."
-                     )},
+                    {
+                        "type": "input_text",
+                        "text": (
+                            "Extract Downlink (Mbps), Uplink (Mbps), Ping (ms), visible clock time (e.g. '20:49'), "
+                            "and device/operator info (e.g. 'inwi SM-S906E | Orange Casablanca'). "
+                            "Return valid JSON with keys: downlink_mbps, uplink_mbps, ping_ms, test_time, device_info, notes."
+                        )
+                    },
                     {"type": "input_image", "image_url": data_url}
                 ],
             }],
         )
 
-        # Try parsing JSON directly from the model output
+        # Try parsing JSON directly
         raw = getattr(resp, "output_text", "")
         m = re.search(r"\{.*\}", raw, re.S)
         if m:
             return json.loads(m.group(0))
 
-        # Fallback regex extraction if JSON fails
+        # Fallback regex extraction
         text = raw.lower()
         num = r"(\d+(?:[.,]\d+)?)"
         dl = ul = ping = time_str = device_info = None
+
         dl_m = re.search(r"(descendant|download|downlink|dl)\D{0,10}" + num, text)
         ul_m = re.search(r"(ascendant|upload|uplink|ul)\D{0,10}" + num, text)
         p_m = re.search(r"(ping)\D{0,6}" + num, text)
@@ -169,6 +172,15 @@ def ask_openai_for_speeds(img_bytes: bytes, model_name: str) -> Dict:
             "notes": f"API error: {e}"
         }
 
+# Helper to split device/operator string
+def split_device_operator(text: str):
+    if not text:
+        return None, None
+    parts = re.split(r"\s*\|\s*", text)
+    if len(parts) == 2:
+        return parts[0].strip(), parts[1].strip()
+    return text.strip(), None
+
 # ----------------------------------------------------
 # 📤 MAIN APP
 # ----------------------------------------------------
@@ -197,9 +209,10 @@ if uploaded_files and run_analysis:
         dl, ul, ping = result.get("downlink_mbps"), result.get("uplink_mbps"), result.get("ping_ms")
         time_str, device_info, notes = result.get("test_time"), result.get("device_info"), result.get("notes")
 
-        down = compute_units(dl)
-        up = compute_units(ul)
+        # Split Device / Operator
+        device, operator = split_device_operator(device_info)
 
+        down, up = compute_units(dl), compute_units(ul)
         rows.append({
             "Image": name,
             "Downlink (Mbps)": dl,
@@ -208,30 +221,29 @@ if uploaded_files and run_analysis:
             "Downlink MB/s": down.get("MBps"),
             "Uplink MB/s": up.get("MBps"),
             "Test Time": time_str,
-            "Device / Operator": device_info,
+            "Device": device,
+            "Operator": operator,
             "Notes": notes,
         })
-
         progress.progress(i / len(uploaded_files))
 
     df = pd.DataFrame(rows)
     st.success("✅ Analysis complete")
 
     st.subheader("📊 Summary Table")
-    st.dataframe(
-        df[[
-            "Image", "Downlink (Mbps)", "Uplink (Mbps)", "Ping (ms)",
-            "Downlink MB/s", "Uplink MB/s", "Test Time", "Device / Operator", "Notes"
-        ]],
-        use_container_width=True
-    )
+    st.dataframe(df, use_container_width=True)
 
-    csv = df.to_csv(index=False).encode("utf-8")
+    # ✅ Export to Excel (safe and formatted)
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name="Speedtest Results")
+    output.seek(0)
+
     st.download_button(
-        "💾 Download results as CSV",
-        data=csv,
-        file_name="speedtest_ai_results.csv",
-        mime="text/csv",
+        "💾 Download results as Excel",
+        data=output,
+        file_name="speedtest_ai_results.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         use_container_width=True
     )
 
@@ -239,3 +251,4 @@ elif uploaded_files and not run_analysis:
     st.warning("⚙️ Click **Run Analysis** to process the uploaded screenshots.")
 else:
     st.info("👆 Upload one or more images to start the analysis.")
+
